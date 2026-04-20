@@ -1,11 +1,13 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -56,13 +58,27 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	mediaType := header.Header.Get("Content-Type")
 
-	fileData, err := io.ReadAll(file)
-	if err != nil {
-		log.Fatalf("Couldn't read file data: %v", err)
+	if !strings.HasPrefix(mediaType, "image/") {
+		respondWithError(w, http.StatusBadRequest, "Unable to parse file prefix. Not an image.", nil)
 		return
 	}
 
-	thumbnailURL := fmt.Sprintf("data:%s;base64,%s", mediaType, base64.StdEncoding.EncodeToString(fileData))
+	extension := strings.TrimSpace(strings.TrimPrefix(mediaType, "image/"))
+	filePath := filepath.Join(cfg.assetsRoot, videoID.String()+"."+extension)
+
+	createdFile, err := os.Create(filePath)
+	if err != nil {
+		log.Fatalf("Couldn't create file: %v", err)
+		return
+	}
+
+	_, err = io.Copy(createdFile, file)
+	if err != nil {
+		log.Fatalf("Couldn't write file: %v", err)
+		return
+	}
+
+	thumbnailURL := fmt.Sprintf("http://localhost:%s/assets/%s.%s", cfg.port, videoID.String(), extension)
 	vidMetaData.ThumbnailURL = &thumbnailURL
 
 	err = cfg.db.UpdateVideo(vidMetaData)
