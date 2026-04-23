@@ -78,9 +78,21 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	tempFile.Seek(0, io.SeekStart)
+	processedFileLocation, err := processVideoForFastStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Falied to process video for FastStart", nil)
+		return
+	}
 
-	aspect, err := getVideoAspectRatio(tempFile.Name())
+	processedFile, err := os.Open(processedFileLocation)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Falied to open processed file", nil)
+		return
+	}
+	defer os.Remove(processedFile.Name())
+	defer processedFile.Close()
+
+	aspect, err := getVideoAspectRatio(processedFile.Name())
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Falied to get file aspect ratio", nil)
 		return
@@ -97,7 +109,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	objectInput := s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         aws.String(fileName),
-		Body:        tempFile,
+		Body:        processedFile,
 		ContentType: &mediaType,
 	}
 	_, err = cfg.s3Client.PutObject(r.Context(), &objectInput)
