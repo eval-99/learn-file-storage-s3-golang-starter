@@ -118,7 +118,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	vidURL := fmt.Sprintf("%s,%s", cfg.s3Bucket, fileName)
+	vidURL := fmt.Sprint(cfg.s3CfDistribution, fileName)
 	vidMetaData.VideoURL = &vidURL
 	err = cfg.db.UpdateVideo(vidMetaData)
 	if err != nil {
@@ -126,11 +126,5 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	signedVideo, err := cfg.dbVideoToSignedVideo(vidMetaData)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Falied to sign video URL", nil)
-		return
-	}
-
-	respondWithJSON(w, http.StatusOK, signedVideo)
+	respondWithJSON(w, http.StatusOK, vidMetaData)
 }
